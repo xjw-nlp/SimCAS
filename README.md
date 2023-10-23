@@ -4,7 +4,7 @@ The repository contains the code, data, and models for the paper [Chunk, Align, 
 - [Recap]()
 - [Installation]()
 - [Training]()
-- [Inference]()
+- [Evaluation]()
 ## Recap
 In this paper, we propose a simple three-stage framework to propose long-sequence input for transformers.
 ![pipeline](./model.png)
@@ -47,12 +47,23 @@ In this paper, we propose a simple three-stage framework to propose long-sequenc
   $ ./runROUGE-test.pl
   # if there is no error message, then you have successfully installed ROUGE
   ```
+- For BERTScore, using evaluation tool from [here](https://github.com/Tiiiger/bert_score)
 ## Training
 ```console
 python main.py --cuda --gpuid [list of gpuid] --config [name of config] -l -p [number of port]
 ```
 ## Evaluation
-For evaluation 
+### Example on SummScreen
+```console
+python main.py --cuda --gpuid 0 --config summscreen -e --model_pt summscreen/model_generation.bin
+
+export CLASSPATH=/nas/xiejiawen/stanford-corenlp-4.4.0/stanford-corenlp-4.4.0.jar
+cat ./result/summscreen/test.out | java edu.stanford.nlp.process.PTBTokenizer -ioFileList -preserveLines > ./result/summscreen/test.out.tokenized
+cat ./result/summscreen/test.target | java edu.stanford.nlp.process.PTBTokenizer -ioFileList -preserveLines > ./result/summscreen/test.target.tokenized
+python cal_rouge.py --ref ./result/summscreen/test.target.tokenized --hyp ./result/summscreen/test.out.tokenized --type summscreen -l
+
+python cal_rouge.py --ref ./result/summscreen/test.target.tokenized --hyp ./result/summscreen/test.out.tokenized --type summscreen -l -p
+```
 ## Citation
 ```console
 @misc{xie2023chunk,
