@@ -11,13 +11,56 @@ In this paper, we propose a simple three-stage framework to propose long-sequenc
 ## Installation
 - `conda create --name env --file spec-file.txt`
 - `pip install -r requirements.txt`
-- using `compare_mt` -> https://github.com/neulab/compare-mt
+- Using `compare_mt` -> https://github.com/neulab/compare-mt
   ```console
   git clone https://github.com/neulab/compare-mt.git
   cd ./compare-mt
   pip install -r requirements.txt
   python setup.py install
   ```
+- For the ROUGE calculation with the standard Perl package from [here](https://github.com/summanlp/evaluation/tree/master/ROUGE-RELEASE-1.5.5).
+  ```console
+  # make sure perl and cpan is installed
+  $ perl --version
+  $ cpan --version
+
+  # install XML::DOM
+  # may need sudo
+  $ sudo cpan XML::DOM
+  
+  # download ROUGE-1.5.5
+  $ git clone https://github.com/summanlp/evaluation
+  
+  # ROUGE 1.5.5 can be found in evaluation/ROUGE-RELEASE-1.5.5
+  $ export ROUGE=/absolute/path/to/ROUGE-RELEASE-1.5.5
+  
+  # Optional: setting environment variable
+  $ echo "export ROUGE=\"${ROUGE}\"" >> ~/.bashrc
+  $ source ~/.bashrc
+  
+  # modify the db file
+  $ cd ${ROUGE}/data/WordNet-2.0-Exceptions/
+  $ mv WordNet-2.0.exc.db WordNet-2.0.exc.db.bak
+  $ ./buildExeptionDB.pl . exc WordNet-2.0.exc.db
+  
+  $ cd $ROUGE
+  $ ./runROUGE-test.pl
+  # if there is no error message, then you have successfully installed ROUGE
+  ```
 ## Training
+```console
+python main.py --cuda --gpuid [list of gpuid] --config [name of config] -l -p [number of port]
+```
 ## Evaluation
 For evaluation 
+## Citation
+```console
+@misc{xie2023chunk,
+      title={Chunk, Align, Select: A Simple Long-sequence Processing Method for Transformers}, 
+      author={Jiawen Xie and Pengyu Cheng and Xiao Liang and Yong Dai and Nan Du},
+      year={2023},
+      eprint={2308.13191},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+```
