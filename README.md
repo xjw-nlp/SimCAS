@@ -1,5 +1,5 @@
 # SimCAS
-The repository contains the code, data, and trained model for the paper [Chunk, Align, Select: A Simple Long-sequence Processing Method for Transformers](https://arxiv.org/abs/2308.13191#).
+The repository contains the code, data, and models for the paper [Chunk, Align, Select: A Simple Long-sequence Processing Method for Transformers](https://arxiv.org/abs/2308.13191#).
 ## Quick Links
 - [Recap]()
 - [Installation]()
@@ -18,3 +18,6 @@ In this paper, we propose a simple three-stage framework to propose long-sequenc
   pip install -r requirements.txt
   python setup.py install
   ```
+## Training
+## Evaluation
+For evaluation 
