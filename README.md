@@ -48,6 +48,18 @@ In this paper, we propose a simple three-stage framework to propose long-sequenc
   # if there is no error message, then you have successfully installed ROUGE
   ```
 - For BERTScore, using evaluation tool from [here](https://github.com/Tiiiger/bert_score)
+
+## Preprocessing
+We use the following datasets for our experiments. 
+- arXiv -> [https://github.com/armancohan/long-summarization](https://github.com/armancohan/long-summarization)
+- PubMed -> [https://github.com/armancohan/long-summarization](https://github.com/armancohan/long-summarization)
+- GovReport -> [https://github.com/luyang-huang96/LongDocSum](https://github.com/luyang-huang96/LongDocSum)
+- SummScreen -> [https://github.com/mingdachen/SummScreen](https://github.com/mingdachen/SummScreen)
+- Multi-News -> [https://github.com/Alex-Fabbri/Multi-News](https://github.com/Alex-Fabbri/Multi-News)
+- WCEP -> [https://github.com/allenai/PRIMER](https://github.com/allenai/PRIMER)
+- NarrativeQA -> [https://github.com/google-deepmind/narrativeqa](https://github.com/google-deepmind/narrativeqa)
+We also download the preprocessed datasets: [arXiv](https://huggingface.co/datasets/ccdv/arxiv-summarization), [PubMed](https://huggingface.co/datasets/ccdv/pubmed-summarization), [GovReport](https://huggingface.co/datasets/ccdv/govreport-summarization), [SummScreen](), [Multi-News](), [WCEP](), [NarrativeQA]().
+  
 ## Training
 ```console
 python main.py --cuda --gpuid [list of gpuid] --config [name of config] -l -p [number of port]
