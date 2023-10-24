@@ -1,10 +1,10 @@
 # SimCAS
 The repository contains the code, data, and models for the paper [Chunk, Align, Select: A Simple Long-sequence Processing Method for Transformers](https://arxiv.org/abs/2308.13191#).
 ## Quick Links
-- [Recap]()
+- [Recap](#recap)
 - [Installation]()
 - [Training]()
-- [Evaluation]()
+- [Evaluation](#evaluation)
 ## Recap
 In this paper, we propose a simple three-stage framework to propose long-sequence input for transformers.
 ![pipeline](./model.png)
