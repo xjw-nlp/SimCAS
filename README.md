@@ -25,30 +25,30 @@ In this paper, we propose a simple three-stage framework to propose long-sequenc
 - For the ROUGE calculation with the standard Perl package from [here](https://github.com/summanlp/evaluation/tree/master/ROUGE-RELEASE-1.5.5).
   ```console
   # make sure perl and cpan is installed
-  $ perl --version
-  $ cpan --version
+  perl --version
+  cpan --version
 
   # install XML::DOM
   # may need sudo
-  $ sudo cpan XML::DOM
+  sudo cpan XML::DOM
   
   # download ROUGE-1.5.5
-  $ git clone https://github.com/summanlp/evaluation
+  git clone https://github.com/summanlp/evaluation
   
   # ROUGE 1.5.5 can be found in evaluation/ROUGE-RELEASE-1.5.5
-  $ export ROUGE=/absolute/path/to/ROUGE-RELEASE-1.5.5
+  export ROUGE=/absolute/path/to/ROUGE-RELEASE-1.5.5
   
   # Optional: setting environment variable
-  $ echo "export ROUGE=\"${ROUGE}\"" >> ~/.bashrc
-  $ source ~/.bashrc
+  echo "export ROUGE=\"${ROUGE}\"" >> ~/.bashrc
+  source ~/.bashrc
   
   # modify the db file
-  $ cd ${ROUGE}/data/WordNet-2.0-Exceptions/
-  $ mv WordNet-2.0.exc.db WordNet-2.0.exc.db.bak
-  $ ./buildExeptionDB.pl . exc WordNet-2.0.exc.db
+  cd ${ROUGE}/data/WordNet-2.0-Exceptions/
+  mv WordNet-2.0.exc.db WordNet-2.0.exc.db.bak
+  ./buildExeptionDB.pl . exc WordNet-2.0.exc.db
   
-  $ cd $ROUGE
-  $ ./runROUGE-test.pl
+  cd $ROUGE
+  ./runROUGE-test.pl
   # if there is no error message, then you have successfully installed ROUGE
   ```
 - For BERTScore, using evaluation tool from [here](https://github.com/Tiiiger/bert_score)
