@@ -10,7 +10,7 @@ The repository contains the code, data, and models for the paper [Chunk, Align, 
 - [Training](#training)
 - [Evaluation](#evaluation)
 ## Recap
-In this paper, we propose a simple three-stage framework to propose long-sequence input for transformers.
+In this paper, we propose a simple three-stage framework to process long-sequence input for transformers.
 ![pipeline](./model.png)
 ## Installation
 - `conda create --name env --file spec-file.txt`
