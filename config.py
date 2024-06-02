@@ -4,8 +4,8 @@ def multinews_setting(args):
     args.report_freq = getattr(args, "report_freq", 50)
     args.accumulate_step = getattr(args, "accumulate_step", 16)
     args.pretrained = getattr(args, "pretrained", None)
-    args.model_type = getattr(args, "model_type", "/apdcephfs_cq2/share_1567347/share_info/model_base/bart-large")
-    args.dataset_name = getattr(args, "dataset_name", "/apdcephfs_cq2/share_1567347/jonxie/workspace/data_base/multi_news")
+    args.model_type = getattr(args, "model_type", "/apdcephfs_qy3/share_1565115/jonxie/model_base/bart-large")
+    args.dataset_name = getattr(args, "dataset_name", "/apdcephfs_qy3/share_1565115/jonxie/data_base/multi_news")
     args.warmup_steps = getattr(args, "warmup_steps", 1600)
     args.normalize = getattr(args, "normalize", True)
     args.grad_norm = getattr(args, "grad_norm", 0)
@@ -19,6 +19,7 @@ def multinews_setting(args):
     args.do_sample = getattr(args, "do_sample", True)
     args.max_input_len = getattr(args, 'max_input_len', 6144)
     args.max_output_len = getattr(args, 'max_output_len', 1024)
+    args.chunk_len = getattr(args, 'chunk_len', 512)
     args.gen_max_len = getattr(args, "gen_max_len", 400)
     args.gen_min_len = getattr(args, "gen_min_len", 150)
     args.adding = getattr(args, "adding", 0)
@@ -28,6 +29,7 @@ def multinews_setting(args):
     args.num_beams = getattr(args, "num_beams", 4)
     args.project_name = getattr(args, "project_name", "bart (simcas-multinews)")
     args.desc = getattr(args, 'desc', 'TODO')
+    args.is_wandb = getattr(args, 'is_wandb', False)
 
 
 def wcep_setting(args):

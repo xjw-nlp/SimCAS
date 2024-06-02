@@ -14,7 +14,7 @@ def to_cuda(batch, gpuid):
 
 
 class AgentDataset(Dataset):
-    def __init__(self, model_type, dataset_name='/apdcephfs_cq3/share_1567347/jonxie/workspace/data_base/arxiv-summarization', data_type='train',  max_input_len=16384, max_output_len=1024, tokenizer=None):
+    def __init__(self, model_type, dataset_name, data_type='train',  max_input_len=16384, max_output_len=1024, tokenizer=None, args=None):
         if tokenizer:
             self.tok = tokenizer
         else:
@@ -29,7 +29,7 @@ class AgentDataset(Dataset):
             
         self.max_output_len = max_output_len
         self.data_type = data_type
-        self.context_len = 512
+        self.context_len = args.chunk_len
         print(self.tok.get_added_vocab())
 
     def __len__(self):

@@ -49,8 +49,6 @@ from transformers.modeling_utils import PreTrainedModel
 from transformers.utils import logging
 from transformers.models.bart.configuration_bart import BartConfig
 
-from utils import visualize_attention
-
 
 logger = logging.get_logger(__name__)
 

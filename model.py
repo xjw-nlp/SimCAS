@@ -7,7 +7,7 @@ from transformers import BartConfig
 
 
 class SimCAS(nn.Module):
-    def __init__(self, mname, pad_token_id):
+    def __init__(self, mname, pad_token_id, args=None):
         super(SimCAS, self).__init__()
         self.model = BartSimCAS.from_pretrained(mname, cache_dir="./local_cache")
         self.pad_token_id = pad_token_id

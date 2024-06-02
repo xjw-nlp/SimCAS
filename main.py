@@ -264,16 +264,15 @@ def run(rank, args):
     is_mp = len(args.gpuid) > 1
     world_size = len(args.gpuid)
     if is_master:
-        wandb.login()
-        project_name = args.project_name
-        desc = args.desc
-        wandb.init(project=project_name, name=desc)
+        if args.is_wandb:
+            wandb.login()
+            wandb.init(project=args.project_name, name=args.desc)
         id = len(os.listdir("./cache"))
-        recorder = Recorder(id, args.log, desc)
+        recorder = Recorder(id, args.log, desc = args.desc)
     # build dataloader
     tok = BartTokenizer.from_pretrained(args.model_type)
-    train_set = AgentDataset(args.model_type, dataset_name=args.dataset_name, data_type='train', tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len)
-    val_set = AgentDataset(args.model_type, dataset_name=args.dataset_name, data_type='validation', tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len)
+    train_set = AgentDataset(args.model_type, dataset_name=args.dataset_name, data_type='train', tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len, args=args)
+    val_set = AgentDataset(args.model_type, dataset_name=args.dataset_name, data_type='validation', tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len, args=args)
     collate_fn = partial(collate_mp_agent, pad_token_id=tok.pad_token_id)
     collate_fn_val = partial(collate_mp_agent, pad_token_id=tok.pad_token_id)
     if is_mp:
@@ -288,7 +287,7 @@ def run(rank, args):
         val_dataloader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=4, collate_fn=collate_fn_val)
     # build models
     model_path = args.pretrained if args.pretrained is not None else args.model_type
-    model = SimCAS(model_path, tok.pad_token_id, is_pegasus=args.is_pegasus, is_primera=args.is_primera)
+    model = SimCAS(model_path, tok.pad_token_id, args=args)
     model.initialize()
     if len(args.model_pt) > 0:
         model.load_state_dict(torch.load(os.path.join("./cache", args.model_pt), map_location=f'cuda:{gpuid}'))
@@ -375,7 +374,7 @@ def run(rank, args):
                 
             step_cnt += 1
             # forward pass
-            output = model(batch["input_ids"], batch["output_ids"], args.normalize)
+            output = model(batch["input_ids"], batch["output_ids"])
                 
             probs = output["probs"]  # [bz, seq_len, word_num]
             probs = output["probs"][:, :-1]  # truncate last token
@@ -501,7 +500,8 @@ def run(rank, args):
                                 agent_optimizer.step()
                                 agent_optimizer.zero_grad()
                             except:
-                                print(f'mb_ids: {mb_inds}, ratio: {ratio}, raw advantage: {mb_advantages}, advantage: {mb_advantages_norm}, v_clipped: {v_loss_clipped}, v_unclipped: {v_loss_unclipped}, p_loss1: {pg_loss1}, p_loss2: {pg_loss2}, entropy: {entropy_loss}')
+                                print(f'mb_ids: {mb_inds}, ratio: {ratio}, raw advantage: {mb_advantages}, advantage: {mb_advantages_norm}, \
+                                      v_clipped: {v_loss_clipped}, v_unclipped: {v_loss_unclipped}, p_loss1: {pg_loss1}, p_loss2: {pg_loss2}, entropy: {entropy_loss}')
                     
                     if is_master:
                         print(f'policy_loss: {avg_policy_loss / count}, value_loss: {avg_value_loss / count}, entropy: {avg_entropy / count}')
@@ -535,7 +535,9 @@ def run(rank, args):
                 recorder.print(f"learning rate: {lr:.6f}, location: {env_loss.get_device()}")
                 recorder.print_len(f"{avg_real_len / args.report_freq} {avg_all_len / args.report_freq}")
                 recorder.print()
-                wandb.log({'loss': avg_loss / args.report_freq, 'mle_loss': avg_mle_loss / args.report_freq, 'learning_rate': lr, 'real_len': avg_real_len / args.report_freq, 'all_len': avg_all_len / args.report_freq})
+                if args.is_wandb:
+                    wandb.log({'loss': avg_loss / args.report_freq, 'mle_loss': avg_mle_loss / args.report_freq, 'learning_rate': lr,
+                                'real_len': avg_real_len / args.report_freq, 'all_len': avg_all_len / args.report_freq})
                 avg_mle_loss, avg_loss, avg_agent_loss, avg_real_len, avg_all_len = 0, 0, 0, 0, 0
             
             del env_loss, output, probs
@@ -573,7 +575,9 @@ def run(rank, args):
                     if args.do_sample:
                         recorder.print("val generation rouge1: %.6f, rouge2: %.6f, rougeL: %.6f, rougeLsum: %.6f"
                         %(result["sample_rouge1"], result["sample_rouge2"], result["sample_rougeL"], result["sample_rougeLsum"]))
-                        wandb.log({'gen_rouge1': result["sample_rouge1"], 'gen_rouge2': result["sample_rouge2"], "gen_rougeL": result["sample_rougeL"], "gen_rougeLsum": result["sample_rougeLsum"]})
+                        if args.is_wandb:
+                            wandb.log({'gen_rouge1': result["sample_rouge1"], 'gen_rouge2': result["sample_rouge2"], "gen_rougeL": result["sample_rougeL"], \
+                                       "gen_rougeLsum": result["sample_rougeLsum"]})
 
 
 def main(args):
