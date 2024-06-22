@@ -170,7 +170,6 @@ def test(gen_dataloader, model, args, tok, gpuid, do_sample=False):
     sample_rouge1, sample_rouge2, sample_rougeL, sample_rougeLsum = 0, 0, 0, 0
     if do_sample:
         # generation
-        _model.generation_mode()
         def process(x):
             return sent_tokenize(" ".join(word_tokenize(x.strip())))
         with torch.no_grad():
@@ -271,8 +270,8 @@ def run(rank, args):
         recorder = Recorder(id, args.log, desc = args.desc)
     # build dataloader
     tok = BartTokenizer.from_pretrained(args.model_type)
-    train_set = AgentDataset(args.model_type, dataset_name=args.dataset_name, data_type='train', tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len, args=args)
-    val_set = AgentDataset(args.model_type, dataset_name=args.dataset_name, data_type='validation', tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len, args=args)
+    train_set = AgentDataset(args, args.model_type, dataset_name=args.dataset_name, data_type='train', tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len)
+    val_set = AgentDataset(args, args.model_type, dataset_name=args.dataset_name, data_type='validation', tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len)
     collate_fn = partial(collate_mp_agent, pad_token_id=tok.pad_token_id)
     collate_fn_val = partial(collate_mp_agent, pad_token_id=tok.pad_token_id)
     if is_mp:
@@ -596,7 +595,7 @@ if __name__ ==  "__main__":
     parser.add_argument("--gpuid", nargs='+', type=int, default=0, help="gpu ids")
     parser.add_argument("-e", "--evaluate", action="store_true", help="evaluate model")
     parser.add_argument("-l", "--log", action="store_true", help="logging")
-    parser.add_argument("-p", "--port", type=int, default=12356, help="port")
+    parser.add_argument("-p", "--port", type=int, default=12358, help="port")
     parser.add_argument("--model_pt", default="", type=str, help="model path")
     parser.add_argument("--config", default="", type=str, help="config path")
     args = parser.parse_args()

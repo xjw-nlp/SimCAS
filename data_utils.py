@@ -14,7 +14,7 @@ def to_cuda(batch, gpuid):
 
 
 class AgentDataset(Dataset):
-    def __init__(self, model_type, dataset_name, data_type='train',  max_input_len=16384, max_output_len=1024, tokenizer=None, args=None):
+    def __init__(self, args, model_type, dataset_name, data_type='train',  max_input_len=16384, max_output_len=1024, tokenizer=None):
         if tokenizer:
             self.tok = tokenizer
         else:
@@ -29,7 +29,9 @@ class AgentDataset(Dataset):
             
         self.max_output_len = max_output_len
         self.data_type = data_type
+        self.config = args.config
         self.context_len = args.chunk_len
+        # self.exp_args = args
         print(self.tok.get_added_vocab())
 
     def __len__(self):
@@ -38,7 +40,7 @@ class AgentDataset(Dataset):
     def __getitem__(self, idx):
         entry = self.hf_dataset[idx]
 
-        if self.ds_name == "multi_news" or "multi_news" in self.ds_name:
+        if self.config == 'multinews':
             # nll pre-training
             documents = entry['document'].split('|||||')
             random.shuffle(documents)
@@ -62,7 +64,7 @@ class AgentDataset(Dataset):
             documents = entry['article']
             input_ids = self.tok.batch_encode_plus([documents], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
             summary = entry['abstract']
-        elif 'govreport' in self.ds_name:
+        elif self.config == 'govreport':
             documents = entry['report']
             input_ids = self.tok.batch_encode_plus([documents], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
             summary = entry['summary']
@@ -104,7 +106,6 @@ def collate_mp_agent(batch, pad_token_id):
     output_ids = pad([x for x in output_ids])
 
     text = [x[2] for x in batch]
-
     result = {
         "input_ids": input_ids,
         "output_ids": output_ids,
