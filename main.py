@@ -18,9 +18,16 @@ from model import SimCAS
 import logging
 from label_smoothing_loss import label_smoothing_loss
 from nltk import sent_tokenize, word_tokenize
-from config import multinews_setting, wcep_setting, arxiv_setting, govreport_setting, pubmed_setting
+from config import (
+    multinews_setting,
+    wcep_setting,
+    arxiv_setting,
+    govreport_setting,
+    pubmed_setting,
+    summscreen_setting,
+    nrtv_setting,
+)
 from tqdm import tqdm
-import wandb
 import math
 import time
 
@@ -248,8 +255,14 @@ def run(rank, args):
         wcep_setting(args)
     elif args.config == 'govreport':
         govreport_setting(args)
+    elif args.config == 'summscreen':
+        summscreen_setting(args)
+    elif args.config == 'arxiv':
+        arxiv_setting(args)
     elif args.config == 'pubmed':
         pubmed_setting(args)
+    elif args.config == 'nrtv':
+        nrtv_setting(args)
     else:
         arxiv_setting(args)
     # task initialization
