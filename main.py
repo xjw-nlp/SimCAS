@@ -30,6 +30,7 @@ from config import (
 from tqdm import tqdm
 import math
 import time
+import wandb
 
 
 logging.getLogger("transformers.tokenization_utils").setLevel(logging.ERROR)
@@ -59,7 +60,7 @@ def evaluation(args):
     dataloader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=4, collate_fn=collate_fn)
     # build models
     model_path = args.pretrained if args.pretrained is not None else args.model_type
-    model = BRIO(model_path, tok.pad_token_id, args.is_pegasus)
+    model = SimCAS(model_path, tok.pad_token_id, args.is_pegasus)
     if args.cuda:
         model = model.cuda()
 
