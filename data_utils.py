@@ -7,6 +7,9 @@ from datasets import load_dataset, load_from_disk
 import random
 
 
+MAX_LENGTH = 10240000
+
+
 def to_cuda(batch, gpuid):
     for n in batch:
         if n != 'text':
@@ -25,7 +28,7 @@ class AgentDataset(Dataset):
         if data_type == 'train':
             self.max_input_len = max_input_len
         else:
-            self.max_input_len = 10240000
+            self.max_input_len = MAX_LENGTH
             
         self.max_output_len = max_output_len
         self.data_type = data_type
@@ -42,36 +45,44 @@ class AgentDataset(Dataset):
 
         if self.config == 'multinews':
             # nll pre-training
-            documents = entry['document'].split('|||||')
-            random.shuffle(documents)
-            num_document = len(documents)
+            input_texts = entry['document'].split('|||||')
+            random.shuffle(input_texts)
+            num_document = len(input_texts)
             max_len_per_doc = self.max_input_len // num_document + 1
             input_idx_arr = []
             for i in range(num_document):
                 if i:
-                    input_idx_arr.append(self.tok.batch_encode_plus([documents[i]], truncation=True, max_length=max_len_per_doc, return_tensors='pt', padding=True)['input_ids'][:, 1:])
+                    input_idx_arr.append(self.tok.batch_encode_plus([input_texts[i]], truncation=True, max_length=max_len_per_doc, return_tensors='pt', padding=True)['input_ids'][:, 1:])
                 else:
-                    input_idx_arr.append(self.tok.batch_encode_plus([documents[i]], truncation=True, max_length=max_len_per_doc, return_tensors='pt', padding=True)['input_ids'])
+                    input_idx_arr.append(self.tok.batch_encode_plus([input_texts[i]], truncation=True, max_length=max_len_per_doc, return_tensors='pt', padding=True)['input_ids'])
             
             input_ids = torch.cat(input_idx_arr, dim=-1)
-            summary = entry['summary']
-        elif "WCEP" in self.ds_name:
+            output_texts = entry['summary']
+        elif self.config == 'wcep':
             # WCEP
-            documents = entry['document'].split('</s>')
-            input_ids = self.tok.batch_encode_plus(['</s>'.join(documents)], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
-            summary = entry['summary']
-        elif 'arxiv' in self.ds_name:
-            documents = entry['article']
-            input_ids = self.tok.batch_encode_plus([documents], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
-            summary = entry['abstract']
+            input_texts = entry['document'].split('</s>')
+            input_ids = self.tok.batch_encode_plus(['</s>'.join(input_texts)], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
+            output_texts = entry['summary']
+        elif self.config == 'arxiv':
+            input_texts = entry['article']
+            input_ids = self.tok.batch_encode_plus([input_texts], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
+            output_texts = entry['abstract']
+        elif self.config == 'pubmed':
+            input_texts = entry['article']
+            input_ids = self.tok.batch_encode_plus([input_texts], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
+            output_texts = entry['abstract']
         elif self.config == 'govreport':
-            documents = entry['report']
-            input_ids = self.tok.batch_encode_plus([documents], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
-            summary = entry['summary']
-        elif 'pubmed' in self.ds_name:
-            documents = entry['article']
-            input_ids = self.tok.batch_encode_plus([documents], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
-            summary = entry['abstract']
+            input_texts = entry['report']
+            input_ids = self.tok.batch_encode_plus([input_texts], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
+            output_texts = entry['summary']
+        elif self.config == 'summscreen':
+            input_texts = entry['Recap']
+            input_ids = self.tok.batch_encode_plus([input_texts], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
+            output_texts = entry['transcript']
+        elif self.config == 'nrtv':
+            input_texts = entry['report']
+            input_ids = self.tok.batch_encode_plus([input_texts], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
+            output_texts = entry['summary']
         else:
             raise ValueError("Dataset name does not match the examples here")
         
@@ -84,7 +95,7 @@ class AgentDataset(Dataset):
             input_ids = torch.nn.functional.pad(_input_ids, (1, 1), value=self.tok.bos_token_id)
             input_ids[:, -1] = self.tok.eos_token_id
         
-        output_ids = self.tok.batch_encode_plus([summary], truncation=True, max_length=self.max_output_len, return_tensors='pt', padding=True)['input_ids']
+        output_ids = self.tok.batch_encode_plus([output_texts], truncation=True, max_length=self.max_output_len, return_tensors='pt', padding=True)['input_ids']
         return input_ids, output_ids, entry
 
 

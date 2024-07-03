@@ -13,6 +13,7 @@ from data_utils import to_cuda, AgentDataset, collate_mp_agent
 from torch.utils.data import DataLoader
 import torch.distributed as dist
 import torch.multiprocessing as mp
+import torch.distributed as dist
 from functools import partial
 from model import SimCAS
 import logging
@@ -265,7 +266,7 @@ def run(rank, args):
     elif args.config == 'nrtv':
         nrtv_setting(args)
     else:
-        arxiv_setting(args)
+        raise NotImplementedError("Error dataset name!")
     # task initialization
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
@@ -280,8 +281,7 @@ def run(rank, args):
         if args.is_wandb:
             wandb.login()
             wandb.init(project=args.project_name, name=args.desc)
-        id = len(os.listdir("./cache"))
-        recorder = Recorder(id, args.log, desc = args.desc)
+        recorder = Recorder(args, args.log, desc=args.desc)
     # build dataloader
     tok = BartTokenizer.from_pretrained(args.model_type)
     train_set = AgentDataset(args, args.model_type, dataset_name=args.dataset_name, data_type='train', tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len)
@@ -332,13 +332,6 @@ def run(rank, args):
         recorder.write_config(args, [model], __file__)
 
     all_step_cnt = 0
-    if is_mp:
-        if is_master:
-            id = torch.FloatTensor([id]).to(gpuid)
-        else:
-            id = torch.zeros(1).to(gpuid)
-        dist.all_reduce(id, op=dist.reduce_op.SUM)
-        id = int(id.item())
     # define evaluation function
     minimum_mle_loss = 1e5
     def eval_fn(rouge1, rouge2, rougeLsum):
@@ -541,8 +534,6 @@ def run(rank, args):
 
             if epoch_step % args.report_freq == 0 and step_cnt == 0 and is_master:
                 # report stats
-        
-                print("id: %d"%id)
                 recorder.print("epoch: %d, batch: %d, agent_loss: %.6f, avg loss: %.6f, avg mle loss: %.6f"
                 %(epoch+1, epoch_step, avg_agent_loss / args.report_freq, avg_loss / args.report_freq, avg_mle_loss / args.report_freq))
                 recorder.print(f"learning rate: {lr:.6f}, location: {env_loss.get_device()}")
@@ -569,7 +560,7 @@ def run(rank, args):
                         recorder.save(model.module, "model_cur.bin")
                     else:
                         recorder.save(model, "model_cur.bin")
-
+                dist.barrier()
                 result = test(val_dataloader, model, args, tok, gpuid, args.do_sample)
                 # evaluate the model as a generator
                 if args.do_sample:

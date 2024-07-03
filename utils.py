@@ -7,12 +7,15 @@ from datetime import datetime
 
 
 class Recorder():
-    def __init__(self, id, log=True, desc=None):
+    def __init__(self, args, log=True, desc=None):
         self.log = log
         now = datetime.now()
         date = now.strftime("%y-%m-%d")
-        self.dir = f"./cache/{date}-{id}"
-
+        cur_dir = f"./cache/{args.config}"
+        if not os.path.isdir(cur_dir):
+            os.mkdir(cur_dir)
+        id = len(os.listdir(cur_dir))
+        self.dir = os.path.join(cur_dir, f"{date}-{id}")
         if self.log:
             try:
                 os.mkdir(self.dir)
