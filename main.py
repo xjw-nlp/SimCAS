@@ -47,10 +47,16 @@ def evaluation(args):
         wcep_setting(args)
     elif args.config == 'govreport':
         govreport_setting(args)
+    elif args.config == 'summscreen':
+        summscreen_setting(args)
+    elif args.config == 'arxiv':
+        arxiv_setting(args)
     elif args.config == 'pubmed':
         pubmed_setting(args)
+    elif args.config == 'nrtv':
+        nrtv_setting(args)
     else:
-        arxiv_setting(args)
+        raise NotImplementedError("Error dataset name!")
 
     tok = BartTokenizer.from_pretrained(args.model_type)
     test_set = AgentDataset(args.model_type, dataset_name=args.dataset_name, data_type='test', is_pegasus=args.is_pegasus, tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len)

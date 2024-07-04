@@ -7,7 +7,7 @@ from datasets import load_dataset, load_from_disk
 import random
 
 
-MAX_LENGTH = 10240000
+MAX_LENGTH = 65536
 
 
 def to_cuda(batch, gpuid):
@@ -76,13 +76,15 @@ class AgentDataset(Dataset):
             input_ids = self.tok.batch_encode_plus([input_texts], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
             output_texts = entry['summary']
         elif self.config == 'summscreen':
-            input_texts = entry['Recap']
+            input_texts = ''.join(entry['Transcript'])
             input_ids = self.tok.batch_encode_plus([input_texts], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
-            output_texts = entry['transcript']
+            output_texts = entry['Recap'][0]
         elif self.config == 'nrtv':
-            input_texts = entry['report']
+            text, text_sum = entry['document']['text'], entry['document']['summary']['text']
+            question = entry['question']['text']
+            input_texts = f"Answer the question: {question}\n\nSummary: {text_sum}\n\nSource: {text}"
             input_ids = self.tok.batch_encode_plus([input_texts], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
-            output_texts = entry['summary']
+            output_texts = random.choice(entry['answers'])['text']
         else:
             raise ValueError("Dataset name does not match the examples here")
         
