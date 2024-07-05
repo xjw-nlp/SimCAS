@@ -120,6 +120,7 @@ def pubmed_setting(args):
     args.do_sample = getattr(args, "do_sample", True)
     args.max_input_len = getattr(args, 'max_input_len', 6144)
     args.max_output_len = getattr(args, 'max_output_len', 1024)
+    args.chunk_len = getattr(args, 'chunk_len', 512)
     args.gen_max_len = getattr(args, "gen_max_len", 400)
     args.gen_min_len = getattr(args, "gen_min_len", 40)
     args.adding = getattr(args, "adding", 0)
@@ -129,6 +130,7 @@ def pubmed_setting(args):
     args.num_beams = getattr(args, "num_beams", 4)
     args.project_name = getattr(args, "project_name", "bart (simcas pubmed)")
     args.desc = getattr(args, 'desc', '')
+    args.is_wandb = getattr(args, 'is_wandb', False)
 
 
 def govreport_setting(args):
@@ -203,10 +205,10 @@ def nrtv_setting(args):
     args.batch_size = getattr(args, 'batch_size', 1)
     args.epoch = getattr(args, 'epoch', 100)
     args.report_freq = getattr(args, "report_freq", 50)
-    args.accumulate_step = getattr(args, "accumulate_step", 16)
+    args.accumulate_step = getattr(args, "accumulate_step", 8)
     args.pretrained = getattr(args, "pretrained", None)
     args.model_type = getattr(args, "model_type", "/apdcephfs_qy3/share_1565115/jonxie/model_base/bart-base")
-    args.dataset_name = getattr(args, "dataset_name", "/apdcephfs_qy3/share_1565115/jonxie/data_base/govreport-summarization")
+    args.dataset_name = getattr(args, "dataset_name", "/apdcephfs_qy3/share_1565115/jonxie/data_base/narrativeqa")
     args.warmup_steps = getattr(args, "warmup_steps", 1600)
     args.normalize = getattr(args, "normalize", True)
     args.grad_norm = getattr(args, "grad_norm", 0)
@@ -224,7 +226,7 @@ def nrtv_setting(args):
     args.gen_max_len = getattr(args, "gen_max_len", 20)
     args.gen_min_len = getattr(args, "gen_min_len", 1)
     args.adding = getattr(args, "adding", 0)
-    args.length_penalty = getattr(args, "length_penalty", 2.0)
+    args.length_penalty = getattr(args, "length_penalty", 3.0)
     args.eval_interval = getattr(args, "eval_interval", 1000)
     args.save_interval = getattr(args, "save_interval", 10000)
     args.num_beams = getattr(args, "num_beams", 4)
