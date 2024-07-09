@@ -32,6 +32,7 @@ from tqdm import tqdm
 import math
 import time
 import wandb
+import evaluate
 
 
 logging.getLogger("transformers.tokenization_utils").setLevel(logging.ERROR)
@@ -162,6 +163,77 @@ def evaluation(args):
         print("evaluation rouge1: %.6f, rouge2: %.6f, rougeL: %.6f, rougeLsum: %.6f"%(sample_rouge1, sample_rouge2, sample_rougeL, sample_rougeLsum))
 
 
+def test_qa(gen_dataloader, model, args, tok, gpuid, do_sample=False):
+    model.eval()
+    if args.cuda:
+        device = f"cuda:{gpuid}"
+    else:
+        device = "cpu"
+    if len(args.gpuid) > 1:
+        _model = model.module
+    else:
+        _model = model
+    cnt = 0
+    squad_scorer = evaluate.load('/apdcephfs_qy3/share_1565115/jonxie/metrics/squad')
+    em_score = f1_score = 0
+    cnt = 0
+    if do_sample:
+        # generation
+        def process(x):
+            return sent_tokenize(" ".join(word_tokenize(x.strip())))
+        with torch.no_grad():
+            for (i, batch) in enumerate(tqdm(gen_dataloader)):
+                if batch['input_ids'].shape[-1] < 10:
+                    continue
+                
+                if args.cuda:
+                    to_cuda(batch, device)
+                answers = _model.generate(
+                    input_ids=batch["input_ids"],
+                    attention_mask=batch["input_ids"] != tok.pad_token_id,
+                    max_length=args.gen_max_len,
+                    min_length=args.gen_min_len,
+                    no_repeat_ngram_size=3,
+                    num_beams=args.num_beams,
+                    length_penalty=args.length_penalty,
+                    early_stopping=True,
+                )
+                dec = [tok.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in answers]
+                for (hypothesis, x) in zip(dec, batch['entry']):
+                    hypothesis = hypothesis.replace("\n", " ")
+                    refs = x['answers']
+                    y = process(hypothesis)
+                    predictions = [{'prediction_text': "\n".join(y), 'id': '56e10a3be3433e1400422b22'}]
+                    per_max_em = per_max_f1 = 0
+                    for ref in refs:
+                        ref = ref['text'].replace("\n", " ")
+                        x = process(ref)
+                        references = [{'answers': {'answer_start': [97], 'text': ["\n".join(x)]}, 'id': '56e10a3be3433e1400422b22'}]
+                        score = squad_scorer.compute(predictions=predictions, references=references)
+                        if score['exact_match'] > per_max_em: per_max_em = score['exact_match']
+                        if score['f1'] > per_max_f1: per_max_f1 = score['f1']
+                    em_score += per_max_em
+                    f1_score += per_max_f1
+                    cnt += 1
+                
+        em_score = em_score / cnt
+        f1_score = f1_score / cnt
+        if len(args.gpuid) > 1:
+            em_score = torch.FloatTensor([em_score]).to(device)
+            dist.all_reduce(em_score, op=dist.reduce_op.SUM)
+            em_score = em_score.item() / len(args.gpuid)
+            f1_score = torch.FloatTensor([f1_score]).to(device)
+            dist.all_reduce(f1_score, op=dist.reduce_op.SUM)
+            f1_score = f1_score.item() / len(args.gpuid)
+        print(em_score, f1_score)
+        
+    model.train()
+    return {
+        "em": em_score,
+        "f1": f1_score,
+        }
+
+
 def test(gen_dataloader, model, args, tok, gpuid, do_sample=False):
     model.eval()
     if args.cuda:
@@ -175,12 +247,6 @@ def test(gen_dataloader, model, args, tok, gpuid, do_sample=False):
     cnt = 0
     rouge_scorer = RougeScorer(['rouge1', 'rouge2', 'rougeL', 'rougeLsum'], use_stemmer=True)
     rouge1, rouge2, rougeLsum = 0, 0, 0
-    mle_loss = 0
-    if args.smooth > 0:
-        mle_fn = label_smoothing_loss(ignore_index=tok.pad_token_id, epsilon=args.smooth)
-    else:
-        mle_fn = nn.CrossEntropyLoss(ignore_index=tok.pad_token_id)
-
     cnt = 0
     sample_rouge1, sample_rouge2, sample_rougeL, sample_rougeLsum = 0, 0, 0, 0
     if do_sample:
@@ -194,7 +260,6 @@ def test(gen_dataloader, model, args, tok, gpuid, do_sample=False):
                 
                 if args.cuda:
                     to_cuda(batch, device)
-
                 summaries = _model.generate(
                     input_ids=batch["input_ids"],
                     attention_mask=batch["input_ids"] != tok.pad_token_id,
@@ -205,15 +270,9 @@ def test(gen_dataloader, model, args, tok, gpuid, do_sample=False):
                     length_penalty=args.length_penalty,
                     early_stopping=True,
                 )
-
                 dec = [tok.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in summaries]
-                for (hypothesis, x) in zip(dec, batch['text']):
+                for (hypothesis, ref) in zip(dec, batch['output_texts']):
                     hypothesis = hypothesis.replace("\n", " ")
-                    try:
-                        ref = x['abstract']
-                    except:
-                        ref = x['summary']
-
                     ref = ref.replace("\n", " ")
                     x = process(ref)
                     y = process(hypothesis)
@@ -252,7 +311,6 @@ def test(gen_dataloader, model, args, tok, gpuid, do_sample=False):
         "sample_rouge2": sample_rouge2,
         "sample_rougeL": sample_rougeL,
         "sample_rougeLsum": sample_rougeLsum,
-        "mle_loss": mle_loss
         } 
 
 
@@ -340,8 +398,8 @@ def run(rank, args):
     all_step_cnt = 0
     # define evaluation function
     minimum_mle_loss = 1e5
-    def eval_fn(rouge1, rouge2, rougeLsum):
-        return 1 - (rouge1 * rouge2 + rougeLsum) / 3
+    def eval_fn(*args):
+        return 1 - sum(args) / len(args)
     # start training
     
     if is_mp:
@@ -566,28 +624,40 @@ def run(rank, args):
                         recorder.save(model.module, "model_cur.bin")
                     else:
                         recorder.save(model, "model_cur.bin")
-                dist.barrier()
-                result = test(val_dataloader, model, args, tok, gpuid, args.do_sample)
-                # evaluate the model as a generator
-                if args.do_sample:
+                if len(args.gpuid) > 1:
+                    dist.barrier()
+                if args.config != 'nrtv':
+                    result = test(val_dataloader, model, args, tok, gpuid, args.do_sample)
                     mle_loss = eval_fn(result["sample_rouge1"], result["sample_rouge2"], result["sample_rougeL"])
-                else:
-                    mle_loss = result["mle_loss"]
-                if mle_loss < minimum_mle_loss and is_master:
-                    minimum_mle_loss = mle_loss
-                    if is_mp:
-                        recorder.save(model.module, "model_generation.bin")
-                    else:
-                        recorder.save(model, "model_generation.bin")
-                    recorder.print("best generation loss - epoch: %d, batch: %d"%(epoch, i / args.accumulate_step))
-                if is_master:
-                    recorder.print("val generation loss: %.6f"%(mle_loss))
-                    if args.do_sample:
+                    if mle_loss < minimum_mle_loss and is_master:
+                        minimum_mle_loss = mle_loss
+                        if is_mp:
+                            recorder.save(model.module, "model_generation.bin")
+                        else:
+                            recorder.save(model, "model_generation.bin")
+                        recorder.print("best generation loss - epoch: %d, batch: %d"%(epoch, i / args.accumulate_step))
+                    if is_master:
+                        recorder.print("val generation loss: %.6f"%(mle_loss))
                         recorder.print("val generation rouge1: %.6f, rouge2: %.6f, rougeL: %.6f, rougeLsum: %.6f"
                         %(result["sample_rouge1"], result["sample_rouge2"], result["sample_rougeL"], result["sample_rougeLsum"]))
                         if args.is_wandb:
                             wandb.log({'gen_rouge1': result["sample_rouge1"], 'gen_rouge2': result["sample_rouge2"], "gen_rougeL": result["sample_rougeL"], \
-                                       "gen_rougeLsum": result["sample_rougeLsum"]})
+                                    "gen_rougeLsum": result["sample_rougeLsum"]})
+                else:
+                    result = test_qa(val_dataloader, model, args, tok, gpuid, args.do_sample)
+                    mle_loss = eval_fn(result["em"], result["f1"])
+                    if mle_loss < minimum_mle_loss and is_master:
+                        minimum_mle_loss = mle_loss
+                        if is_mp:
+                            recorder.save(model.module, "model_generation.bin")
+                        else:
+                            recorder.save(model, "model_generation.bin")
+                        recorder.print("best generation loss - epoch: %d, batch: %d"%(epoch, i / args.accumulate_step))
+                    if is_master:
+                        recorder.print("val generation loss: %.6f"%(mle_loss))
+                        recorder.print("val EM: %.6f, F1: %.6f" % (result["em"], result["f1"]))
+                        if args.is_wandb:
+                            wandb.log({'EM': result["em"], 'F1': result["f1"]})
 
 
 def main(args):

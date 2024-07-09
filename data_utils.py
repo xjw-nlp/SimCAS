@@ -12,7 +12,7 @@ MAX_LENGTH = 65536
 
 def to_cuda(batch, gpuid):
     for n in batch:
-        if n != 'text':
+        if 'ids' in n:
             batch[n] = batch[n].to(gpuid)
 
 
@@ -34,7 +34,6 @@ class AgentDataset(Dataset):
         self.data_type = data_type
         self.config = args.config
         self.context_len = args.chunk_len
-        # self.exp_args = args
         print(self.tok.get_added_vocab())
 
     def __len__(self):
@@ -60,8 +59,8 @@ class AgentDataset(Dataset):
             output_texts = entry['summary']
         elif self.config == 'wcep':
             # WCEP
-            input_texts = entry['document'].split('</s>')
-            input_ids = self.tok.batch_encode_plus(['</s>'.join(input_texts)], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
+            input_texts = entry['document']
+            input_ids = self.tok.batch_encode_plus([input_texts], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
             output_texts = entry['summary']
         elif self.config == 'arxiv':
             input_texts = entry['article']
@@ -98,7 +97,7 @@ class AgentDataset(Dataset):
             input_ids[:, -1] = self.tok.eos_token_id
         
         output_ids = self.tok.batch_encode_plus([output_texts], truncation=True, max_length=self.max_output_len, return_tensors='pt', padding=True)['input_ids']
-        return input_ids, output_ids, entry
+        return input_ids, output_ids, input_texts, output_texts, entry
 
 
 def collate_mp_agent(batch, pad_token_id):
@@ -118,11 +117,14 @@ def collate_mp_agent(batch, pad_token_id):
     output_ids = [x[1][0] for x in batch]
     output_ids = pad([x for x in output_ids])
 
-    text = [x[2] for x in batch]
+    input_texts = [x[2] for x in batch]
+    output_texts = [x[3] for x in batch]
+    entry = [x[4] for x in batch]
     result = {
         "input_ids": input_ids,
         "output_ids": output_ids,
-        "text": text,
+        "input_texts": input_texts,
+        "output_texts": output_texts,
+        "entry": entry,
         }
-
     return result
