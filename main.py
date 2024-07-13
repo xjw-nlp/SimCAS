@@ -60,15 +60,14 @@ def evaluation(args):
         raise NotImplementedError("Error dataset name!")
 
     tok = BartTokenizer.from_pretrained(args.model_type)
-    test_set = AgentDataset(args.model_type, dataset_name=args.dataset_name, data_type='test', is_pegasus=args.is_pegasus, tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len)
-    collate_fn = partial(collate_mp_multi_news, pad_token_id=tok.pad_token_id)
-    
+    test_set = AgentDataset(args, args.model_type, dataset_name=args.dataset_name, data_type='test', tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len)
+    collate_fn = partial(collate_mp_agent, pad_token_id=tok.pad_token_id)
     batch_size = 1
     cnt = 0
     dataloader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=4, collate_fn=collate_fn)
     # build models
     model_path = args.pretrained if args.pretrained is not None else args.model_type
-    model = SimCAS(model_path, tok.pad_token_id, args.is_pegasus)
+    model = SimCAS(model_path, tok.pad_token_id, args=args)
     if args.cuda:
         model = model.cuda()
 
@@ -81,30 +80,69 @@ def evaluation(args):
     def mkdir(path):
         if not os.path.exists(path):
             os.mkdir(path)
-
+    def process(x):
+        return sent_tokenize(" ".join(word_tokenize(x.strip())))
+    
     print(model_name)
     root_dir = "./result/%s" % model_name
     mkdir(root_dir)
-    rouge_scorer = RougeScorer(['rouge1', 'rouge2', 'rougeL', 'rougeLsum'], use_stemmer=True)
-    cumul_time = 0
-    cumul_real_len = 0
     print(args.model_pt)
-    if args.do_generation:
-        sample_rouge1, sample_rouge2, sample_rougeL, sample_rougeLsum = 0, 0, 0, 0
-        model.generation_mode()
-        def process(x):
-            return sent_tokenize(" ".join(word_tokenize(x.strip())))
-        
+    if args.config == 'nrtv':
+        squad_scorer = evaluate.load('/apdcephfs_qy3/share_1565115/jonxie/metrics/squad')
+        em_score = f1_score = 0
         with open(os.path.join(root_dir, "test.out"), 'w') as fout, open(os.path.join(root_dir, "test.target"), 'w') as fref:
             with torch.no_grad():
                 for (i, batch) in enumerate(tqdm(dataloader)):
                     if batch['input_ids'].shape[-1] < 10:
                         continue
-                    
                     if args.cuda:
                         to_cuda(batch, device)
-
-                    st_time = time.time()
+                    answers = model.generate(
+                        input_ids=batch["input_ids"],
+                        attention_mask=batch["input_ids"] != tok.pad_token_id,
+                        max_length=args.gen_max_len,
+                        min_length=args.gen_min_len,
+                        no_repeat_ngram_size=3,
+                        num_beams=args.num_beams,
+                        length_penalty=args.length_penalty,
+                        early_stopping=True,
+                    )
+                    dec = [tok.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in answers]
+                    for (hypothesis, refs) in zip(dec, batch['output_texts']):
+                        hypothesis = hypothesis.replace("\n", " ")
+                        y = process(hypothesis)
+                        predictions = [{'prediction_text': "\n".join(y), 'id': '56e10a3be3433e1400422b22'}]
+                        per_max_em = per_max_f1 = 0
+                        for ref in refs:
+                            ref = ref.replace("\n", " ")
+                            x = process(ref)
+                            references = [{'answers': {'answer_start': [97], 'text': ["\n".join(x)]}, 'id': '56e10a3be3433e1400422b22'}]
+                            score = squad_scorer.compute(predictions=predictions, references=references)
+                            if score['exact_match'] > per_max_em: per_max_em = score['exact_match']
+                            if score['f1'] > per_max_f1: per_max_f1 = score['f1']
+                        em_score += per_max_em
+                        f1_score += per_max_f1
+                        cnt += 1
+        em_score = em_score / cnt
+        f1_score = f1_score / cnt
+        if len(args.gpuid) > 1:
+            em_score = torch.FloatTensor([em_score]).to(device)
+            dist.all_reduce(em_score, op=dist.reduce_op.SUM)
+            em_score = em_score.item() / len(args.gpuid)
+            f1_score = torch.FloatTensor([f1_score]).to(device)
+            dist.all_reduce(f1_score, op=dist.reduce_op.SUM)
+            f1_score = f1_score.item() / len(args.gpuid)
+        print("evaluation EM: %.6f, F1: %.6f" % (em_score, f1_score))
+    else:
+        sample_rouge1, sample_rouge2, sample_rougeL, sample_rougeLsum = 0, 0, 0, 0
+        rouge_scorer = RougeScorer(['rouge1', 'rouge2', 'rougeL', 'rougeLsum'], use_stemmer=True)
+        with open(os.path.join(root_dir, "test.out"), 'w') as fout, open(os.path.join(root_dir, "test.target"), 'w') as fref:
+            with torch.no_grad():
+                for (i, batch) in enumerate(tqdm(dataloader)):
+                    if batch['input_ids'].shape[-1] < 10:
+                        continue
+                    if args.cuda:
+                        to_cuda(batch, device)
                     summaries = model.generate(
                         input_ids=batch["input_ids"],
                         attention_mask=batch["input_ids"] != tok.pad_token_id,
@@ -115,19 +153,9 @@ def evaluation(args):
                         length_penalty=args.length_penalty,
                         early_stopping=True,
                     )
-                    ed_time = time.time()
-                    cumul_time += ed_time - st_time
-                    cumul_real_len += model.model.agent_dict['real_len']
-                    if i == 10:
-                        print(cumul_time, cumul_real_len / 11)
                     dec = [tok.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in summaries]
-                    for (hypothesis, x) in zip(dec, batch['text']):
+                    for (hypothesis, ref) in zip(dec, batch['output_texts']):
                         hypothesis = hypothesis.replace("\n", " ")
-                        try:
-                            ref = x['abstract']
-                        except:
-                            ref = x['summary']
-                        
                         ref = ref.replace("\n", " ")
                         fout.write(hypothesis + '\n')
                         fout.flush()
@@ -141,7 +169,6 @@ def evaluation(args):
                         sample_rougeL += score["rougeL"].fmeasure
                         sample_rougeLsum += score["rougeLsum"].fmeasure
                         cnt += 1
-
         sample_rouge1 = sample_rouge1 / cnt
         sample_rouge2 = sample_rouge2 / cnt
         sample_rougeL = sample_rougeL / cnt
@@ -159,7 +186,6 @@ def evaluation(args):
             sample_rougeLsum = torch.FloatTensor([sample_rougeLsum]).to(device)
             dist.all_reduce(sample_rougeLsum, op=dist.reduce_op.SUM)
             sample_rougeLsum = sample_rougeLsum.item() / len(args.gpuid)
-
         print("evaluation rouge1: %.6f, rouge2: %.6f, rougeL: %.6f, rougeLsum: %.6f"%(sample_rouge1, sample_rouge2, sample_rougeL, sample_rougeLsum))
 
 
@@ -174,59 +200,54 @@ def test_qa(gen_dataloader, model, args, tok, gpuid, do_sample=False):
     else:
         _model = model
     cnt = 0
+    def process(x):
+        return sent_tokenize(" ".join(word_tokenize(x.strip())))
     squad_scorer = evaluate.load('/apdcephfs_qy3/share_1565115/jonxie/metrics/squad')
     em_score = f1_score = 0
     cnt = 0
-    if do_sample:
-        # generation
-        def process(x):
-            return sent_tokenize(" ".join(word_tokenize(x.strip())))
-        with torch.no_grad():
-            for (i, batch) in enumerate(tqdm(gen_dataloader)):
-                if batch['input_ids'].shape[-1] < 10:
-                    continue
-                
-                if args.cuda:
-                    to_cuda(batch, device)
-                answers = _model.generate(
-                    input_ids=batch["input_ids"],
-                    attention_mask=batch["input_ids"] != tok.pad_token_id,
-                    max_length=args.gen_max_len,
-                    min_length=args.gen_min_len,
-                    no_repeat_ngram_size=3,
-                    num_beams=args.num_beams,
-                    length_penalty=args.length_penalty,
-                    early_stopping=True,
-                )
-                dec = [tok.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in answers]
-                for (hypothesis, x) in zip(dec, batch['entry']):
-                    hypothesis = hypothesis.replace("\n", " ")
-                    refs = x['answers']
-                    y = process(hypothesis)
-                    predictions = [{'prediction_text': "\n".join(y), 'id': '56e10a3be3433e1400422b22'}]
-                    per_max_em = per_max_f1 = 0
-                    for ref in refs:
-                        ref = ref['text'].replace("\n", " ")
-                        x = process(ref)
-                        references = [{'answers': {'answer_start': [97], 'text': ["\n".join(x)]}, 'id': '56e10a3be3433e1400422b22'}]
-                        score = squad_scorer.compute(predictions=predictions, references=references)
-                        if score['exact_match'] > per_max_em: per_max_em = score['exact_match']
-                        if score['f1'] > per_max_f1: per_max_f1 = score['f1']
-                    em_score += per_max_em
-                    f1_score += per_max_f1
-                    cnt += 1
-                
-        em_score = em_score / cnt
-        f1_score = f1_score / cnt
-        if len(args.gpuid) > 1:
-            em_score = torch.FloatTensor([em_score]).to(device)
-            dist.all_reduce(em_score, op=dist.reduce_op.SUM)
-            em_score = em_score.item() / len(args.gpuid)
-            f1_score = torch.FloatTensor([f1_score]).to(device)
-            dist.all_reduce(f1_score, op=dist.reduce_op.SUM)
-            f1_score = f1_score.item() / len(args.gpuid)
-        print(em_score, f1_score)
-        
+    # generation
+    with torch.no_grad():
+        for (i, batch) in enumerate(tqdm(gen_dataloader)):
+            if batch['input_ids'].shape[-1] < 10:
+                continue
+            if args.cuda:
+                to_cuda(batch, device)
+            answers = _model.generate(
+                input_ids=batch["input_ids"],
+                attention_mask=batch["input_ids"] != tok.pad_token_id,
+                max_length=args.gen_max_len,
+                min_length=args.gen_min_len,
+                no_repeat_ngram_size=3,
+                num_beams=args.num_beams,
+                length_penalty=args.length_penalty,
+                early_stopping=True,
+            )
+            dec = [tok.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in answers]
+            for (hypothesis, refs) in zip(dec, batch['output_texts']):
+                hypothesis = hypothesis.replace("\n", " ")
+                y = process(hypothesis)
+                predictions = [{'prediction_text': "\n".join(y), 'id': '56e10a3be3433e1400422b22'}]
+                per_max_em = per_max_f1 = 0
+                for ref in refs:
+                    ref = ref.replace("\n", " ")
+                    x = process(ref)
+                    references = [{'answers': {'answer_start': [97], 'text': ["\n".join(x)]}, 'id': '56e10a3be3433e1400422b22'}]
+                    score = squad_scorer.compute(predictions=predictions, references=references)
+                    if score['exact_match'] > per_max_em: per_max_em = score['exact_match']
+                    if score['f1'] > per_max_f1: per_max_f1 = score['f1']
+                em_score += per_max_em
+                f1_score += per_max_f1
+                cnt += 1
+    em_score = em_score / cnt
+    f1_score = f1_score / cnt
+    if len(args.gpuid) > 1:
+        em_score = torch.FloatTensor([em_score]).to(device)
+        dist.all_reduce(em_score, op=dist.reduce_op.SUM)
+        em_score = em_score.item() / len(args.gpuid)
+        f1_score = torch.FloatTensor([f1_score]).to(device)
+        dist.all_reduce(f1_score, op=dist.reduce_op.SUM)
+        f1_score = f1_score.item() / len(args.gpuid)
+    print(em_score, f1_score)
     model.train()
     return {
         "em": em_score,
@@ -244,69 +265,60 @@ def test(gen_dataloader, model, args, tok, gpuid, do_sample=False):
         _model = model.module
     else:
         _model = model
+    def process(x):
+        return sent_tokenize(" ".join(word_tokenize(x.strip())))
     cnt = 0
     rouge_scorer = RougeScorer(['rouge1', 'rouge2', 'rougeL', 'rougeLsum'], use_stemmer=True)
-    rouge1, rouge2, rougeLsum = 0, 0, 0
     cnt = 0
     sample_rouge1, sample_rouge2, sample_rougeL, sample_rougeLsum = 0, 0, 0, 0
-    if do_sample:
-        # generation
-        def process(x):
-            return sent_tokenize(" ".join(word_tokenize(x.strip())))
-        with torch.no_grad():
-            for (i, batch) in enumerate(tqdm(gen_dataloader)):
-                if batch['input_ids'].shape[-1] < 10:
-                    continue
-                
-                if args.cuda:
-                    to_cuda(batch, device)
-                summaries = _model.generate(
-                    input_ids=batch["input_ids"],
-                    attention_mask=batch["input_ids"] != tok.pad_token_id,
-                    max_length=args.gen_max_len + 2,  # +2 from original because we start at step=1 and stop before max_length
-                    min_length=args.gen_min_len + 1,  # +1 from original because we start at step=1
-                    no_repeat_ngram_size=3,
-                    num_beams=args.num_beams,
-                    length_penalty=args.length_penalty,
-                    early_stopping=True,
-                )
-                dec = [tok.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in summaries]
-                for (hypothesis, ref) in zip(dec, batch['output_texts']):
-                    hypothesis = hypothesis.replace("\n", " ")
-                    ref = ref.replace("\n", " ")
-                    x = process(ref)
-                    y = process(hypothesis)
-                    score = rouge_scorer.score("\n".join(x), "\n".join(y))
-                    sample_rouge1 += score["rouge1"].fmeasure
-                    sample_rouge2 += score["rouge2"].fmeasure
-                    sample_rougeL += score["rougeL"].fmeasure
-                    sample_rougeLsum += score["rougeLsum"].fmeasure
-                    cnt += 1
-                    
-        sample_rouge1 = sample_rouge1 / cnt
-        sample_rouge2 = sample_rouge2 / cnt
-        sample_rougeL = sample_rougeL / cnt
-        sample_rougeLsum = sample_rougeLsum / cnt
-        if len(args.gpuid) > 1:
-            sample_rouge1 = torch.FloatTensor([sample_rouge1]).to(device)
-            dist.all_reduce(sample_rouge1, op=dist.reduce_op.SUM)
-            sample_rouge1 = sample_rouge1.item() / len(args.gpuid)
-            sample_rouge2 = torch.FloatTensor([sample_rouge2]).to(device)
-            dist.all_reduce(sample_rouge2, op=dist.reduce_op.SUM)
-            sample_rouge2 = sample_rouge2.item() / len(args.gpuid)
-            sample_rougeL = torch.FloatTensor([sample_rougeL]).to(device)
-            dist.all_reduce(sample_rougeL, op=dist.reduce_op.SUM)
-            sample_rougeL = sample_rougeL.item() / len(args.gpuid)
-            sample_rougeLsum = torch.FloatTensor([sample_rougeLsum]).to(device)
-            dist.all_reduce(sample_rougeLsum, op=dist.reduce_op.SUM)
-            sample_rougeLsum = sample_rougeLsum.item() / len(args.gpuid)
-        print(sample_rouge1, sample_rouge2, sample_rougeL, sample_rougeLsum)
-        
+    with torch.no_grad():
+        for (i, batch) in enumerate(tqdm(gen_dataloader)):
+            if batch['input_ids'].shape[-1] < 10:
+                continue
+            if args.cuda:
+                to_cuda(batch, device)
+            summaries = _model.generate(
+                input_ids=batch["input_ids"],
+                attention_mask=batch["input_ids"] != tok.pad_token_id,
+                max_length=args.gen_max_len + 2,  # +2 from original because we start at step=1 and stop before max_length
+                min_length=args.gen_min_len + 1,  # +1 from original because we start at step=1
+                no_repeat_ngram_size=3,
+                num_beams=args.num_beams,
+                length_penalty=args.length_penalty,
+                early_stopping=True,
+            )
+            dec = [tok.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=False) for g in summaries]
+            for (hypothesis, ref) in zip(dec, batch['output_texts']):
+                hypothesis = hypothesis.replace("\n", " ")
+                ref = ref.replace("\n", " ")
+                x = process(ref)
+                y = process(hypothesis)
+                score = rouge_scorer.score("\n".join(x), "\n".join(y))
+                sample_rouge1 += score["rouge1"].fmeasure
+                sample_rouge2 += score["rouge2"].fmeasure
+                sample_rougeL += score["rougeL"].fmeasure
+                sample_rougeLsum += score["rougeLsum"].fmeasure
+                cnt += 1
+    sample_rouge1 = sample_rouge1 / cnt
+    sample_rouge2 = sample_rouge2 / cnt
+    sample_rougeL = sample_rougeL / cnt
+    sample_rougeLsum = sample_rougeLsum / cnt
+    if len(args.gpuid) > 1:
+        sample_rouge1 = torch.FloatTensor([sample_rouge1]).to(device)
+        dist.all_reduce(sample_rouge1, op=dist.reduce_op.SUM)
+        sample_rouge1 = sample_rouge1.item() / len(args.gpuid)
+        sample_rouge2 = torch.FloatTensor([sample_rouge2]).to(device)
+        dist.all_reduce(sample_rouge2, op=dist.reduce_op.SUM)
+        sample_rouge2 = sample_rouge2.item() / len(args.gpuid)
+        sample_rougeL = torch.FloatTensor([sample_rougeL]).to(device)
+        dist.all_reduce(sample_rougeL, op=dist.reduce_op.SUM)
+        sample_rougeL = sample_rougeL.item() / len(args.gpuid)
+        sample_rougeLsum = torch.FloatTensor([sample_rougeLsum]).to(device)
+        dist.all_reduce(sample_rougeLsum, op=dist.reduce_op.SUM)
+        sample_rougeLsum = sample_rougeLsum.item() / len(args.gpuid)
+    print(sample_rouge1, sample_rouge2, sample_rougeL, sample_rougeLsum)
     model.train()
     return {
-        "rouge1": rouge1,
-        "rouge2": rouge2,
-        "rougeLsum": rougeLsum,
         "sample_rouge1": sample_rouge1,
         "sample_rouge2": sample_rouge2,
         "sample_rougeL": sample_rougeL,
@@ -337,7 +349,8 @@ def run(rank, args):
     np.random.seed(args.seed)
     random.seed(args.seed)
     torch.autograd.set_detect_anomaly(True)
-    gpuid = args.gpuid[rank]
+    # gpuid = args.gpuid[rank]
+    gpuid = rank
     is_master = rank == 0
     is_mp = len(args.gpuid) > 1
     world_size = len(args.gpuid)
@@ -360,8 +373,8 @@ def run(rank, args):
     	 val_set, num_replicas=world_size, rank=rank)
         val_dataloader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=4, collate_fn=collate_fn_val, sampler=val_sampler)
     else:
-        dataloader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn)
-        val_dataloader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=4, collate_fn=collate_fn_val)
+        dataloader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=1, collate_fn=collate_fn)
+        val_dataloader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=1, collate_fn=collate_fn_val)
     # build models
     model_path = args.pretrained if args.pretrained is not None else args.model_type
     model = SimCAS(model_path, tok.pad_token_id, args=args)
@@ -601,7 +614,6 @@ def run(rank, args):
                 recorder.print("epoch: %d, batch: %d, agent_loss: %.6f, avg loss: %.6f, avg mle loss: %.6f"
                 %(epoch+1, epoch_step, avg_agent_loss / args.report_freq, avg_loss / args.report_freq, avg_mle_loss / args.report_freq))
                 recorder.print(f"learning rate: {lr:.6f}, location: {env_loss.get_device()}")
-                recorder.print_len(f"{avg_real_len / args.report_freq} {avg_all_len / args.report_freq}")
                 recorder.print()
                 if args.is_wandb:
                     wandb.log({'loss': avg_loss / args.report_freq, 'mle_loss': avg_mle_loss / args.report_freq, 'learning_rate': lr,
@@ -667,7 +679,6 @@ def main(args):
         os.environ['MASTER_PORT'] = f'{args.port}'
         mp.spawn(run, args=(args,), nprocs=len(args.gpuid), join=True)
     else:
-        os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
         run(0, args)
 
 if __name__ ==  "__main__":
@@ -676,11 +687,13 @@ if __name__ ==  "__main__":
     parser.add_argument("--gpuid", nargs='+', type=int, default=0, help="gpu ids")
     parser.add_argument("-e", "--evaluate", action="store_true", help="evaluate model")
     parser.add_argument("-l", "--log", action="store_true", help="logging")
+    parser.add_argument("--is_offline", action="store_true", help="data processing mode")
     parser.add_argument("-p", "--port", type=int, default=12358, help="port")
     parser.add_argument("--model_pt", default="", type=str, help="model path")
     parser.add_argument("--config", default="", type=str, help="config path")
     args = parser.parse_args()
-    # print(args.gpuid, type(args.gpuid)) list
+    os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, args.gpuid))
+    args.gpuid = list(range(len(args.gpuid)))
     if args.cuda is False:
         if args.evaluate:
             evaluation(args)

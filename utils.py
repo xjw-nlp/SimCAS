@@ -27,7 +27,6 @@ class Recorder():
                     f.write(desc)
                 self.f = open(os.path.join(self.dir, "log.txt"), "w")
             self.f = open(os.path.join(self.dir, "log.txt"), "w")
-            self.f_length = open(os.path.join(self.dir, "length.txt"), "w")
             self.writer = SummaryWriter(os.path.join(self.dir, "log"), flush_secs=60)
         
     def write_config(self, args, models, name):
@@ -44,13 +43,6 @@ class Recorder():
         for (i, x) in enumerate(models):
             print(x)
             print()
-    
-    def print_len(self, x=None):
-        if self.log:
-            if x is not None:
-                print(x, file=self.f_length, flush=True)
-            else:
-                print(file=self.f_length, flush=True)
 
     def print(self, x=None):
         if x is not None:
