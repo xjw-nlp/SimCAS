@@ -141,7 +141,7 @@ def govreport_setting(args):
     args.accumulate_step = getattr(args, "accumulate_step", 16)
     args.pretrained = getattr(args, "pretrained", None)
     args.model_type = getattr(args, "model_type", "/apdcephfs_qy3/share_1565115/jonxie/model_base/bart-base")
-    args.dataset_name = getattr(args, "dataset_name", "/apdcephfs_qy3/share_1565115/jonxie/data_base/govreport-summarization")
+    args.dataset_name = getattr(args, "dataset_name", "/apdcephfs_qy3/share_1565115/jonxie/data_base/SimCAS/govreport_bart_512")
     args.warmup_steps = getattr(args, "warmup_steps", 1600)
     args.normalize = getattr(args, "normalize", True)
     args.grad_norm = getattr(args, "grad_norm", 0)

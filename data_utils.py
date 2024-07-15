@@ -33,7 +33,7 @@ class AgentDataset(Dataset):
         self.max_output_len = max_output_len
         self.data_type = data_type
         self.config = args.config
-        self.context_len = args.chunk_len
+        self.chunk_len = args.chunk_len
         self.is_offline = args.is_offline
         print(self.tok.get_added_vocab())
 
@@ -42,45 +42,51 @@ class AgentDataset(Dataset):
 
     def __getitem__(self, idx):
         entry = self.hf_dataset[idx]
-        if self.config == 'multinews':
-            input_texts = entry['document'].split('|||||')
-            random.shuffle(input_texts)
-            input_texts = '</s>'.join(input_texts)
-            output_texts = entry['summary']
-        elif self.config == 'wcep':
-            input_texts = entry['document'].split('</s>')
-            random.shuffle(input_texts)
-            input_texts = '</s>'.join(input_texts)
-            output_texts = entry['summary']
-        elif self.config == 'arxiv':
-            input_texts = entry['article']
-            output_texts = entry['abstract']
-        elif self.config == 'pubmed':
-            input_texts = entry['article']
-            output_texts = entry['abstract']
-        elif self.config == 'govreport':
-            input_texts = entry['report']
-            output_texts = entry['summary']
-        elif self.config == 'summscreen':
-            input_texts = '\n'.join(entry['Transcript'])
-            output_texts = entry['Recap'][0]
-        elif self.config == 'nrtv':
-            text, text_sum = entry['document']['text'], entry['document']['summary']['text']
-            question = entry['question']['text']
-            input_texts = f"Answer the question: {question}\n\nSummary: {text_sum}\n\nSource: {text}"
-            output_texts = [item['text'] for item in entry['answers']]
+        if self.is_offline:
+            input_ids = torch.tensor(entry['input_ids'][:self.max_input_len // self.chunk_len])
+            input_texts = entry['input_texts']
+            output_texts = entry['output_texts']
         else:
-            raise ValueError("Dataset name does not match the examples here")
+            if self.config == 'multinews':
+                input_texts = entry['document'].split('|||||')
+                random.shuffle(input_texts)
+                input_texts = '</s>'.join(input_texts)
+                output_texts = entry['summary']
+            elif self.config == 'wcep':
+                input_texts = entry['document'].split('</s>')
+                random.shuffle(input_texts)
+                input_texts = '</s>'.join(input_texts)
+                output_texts = entry['summary']
+            elif self.config == 'arxiv':
+                input_texts = entry['article']
+                output_texts = entry['abstract']
+            elif self.config == 'pubmed':
+                input_texts = entry['article']
+                output_texts = entry['abstract']
+            elif self.config == 'govreport':
+                input_texts = entry['report']
+                output_texts = entry['summary']
+            elif self.config == 'summscreen':
+                input_texts = '\n'.join(entry['Transcript'])
+                output_texts = entry['Recap'][0]
+            elif self.config == 'nrtv':
+                text, text_sum = entry['document']['text'], entry['document']['summary']['text']
+                question = entry['question']['text']
+                input_texts = f"Answer the question: {question}\n\nSummary: {text_sum}\n\nSource: {text}"
+                output_texts = [item['text'] for item in entry['answers']]
+            else:
+                raise ValueError("Dataset name does not match the examples here")
         
-        input_ids = self.tok.batch_encode_plus([input_texts], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
-        input_shape = input_ids.shape
-        if input_shape[-1] > self.context_len:
-            add_num = (input_shape[-1] - 3) // (self.context_len - 2)
-            _input_ids = input_ids.new_ones(1, (add_num + 1) * (self.context_len - 2)) * self.tok.pad_token_id
-            _input_ids[:, 0: input_shape[-1] - 2] = input_ids[:, 1: -1]
-            _input_ids = _input_ids.reshape(add_num + 1, (self.context_len - 2))
-            input_ids = torch.nn.functional.pad(_input_ids, (1, 1), value=self.tok.bos_token_id)
-            input_ids[:, -1] = self.tok.eos_token_id
+            input_ids = self.tok.batch_encode_plus([input_texts], truncation=True, max_length=self.max_input_len, return_tensors='pt', padding=True)['input_ids']
+            input_shape = input_ids.shape
+            if input_shape[-1] > self.chunk_len:
+                add_num = (input_shape[-1] - 3) // (self.chunk_len - 2)
+                _input_ids = input_ids.new_ones(1, (add_num + 1) * (self.chunk_len - 2)) * self.tok.pad_token_id
+                _input_ids[:, 0: input_shape[-1] - 2] = input_ids[:, 1: -1]
+                _input_ids = _input_ids.reshape(add_num + 1, (self.chunk_len - 2))
+                input_ids = torch.nn.functional.pad(_input_ids, (1, 1), value=self.tok.bos_token_id)
+                input_ids[:, -1] = self.tok.eos_token_id
+
         if self.config == 'nrtv':
             output_ids = self.tok.batch_encode_plus([random.choice(output_texts)], truncation=True, max_length=self.max_output_len, return_tensors='pt', padding=True)['input_ids']
         else:
