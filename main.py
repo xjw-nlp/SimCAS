@@ -342,7 +342,7 @@ def run(rank, args):
     elif args.config == 'nrtv':
         nrtv_setting(args)
     else:
-        raise NotImplementedError("Error dataset name!")
+        raise NotImplementedError("Error dataset Name!")
     # task initialization
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)

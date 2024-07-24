@@ -8,12 +8,23 @@
 The repository contains the source code, data, and models for the paper [Chunk, Align, Select: A Simple Long-sequence Processing Method for Transformers](https://arxiv.org/abs/2308.13191#), ACL 2024.
 ## Quick Links
 - [Recap](#recap)
+- [Requirements](#requirements)
 - [Installation](#installation)
+- [Datasets](#datasets)
 - [Training](#training)
 - [Evaluation](#evaluation)
+- [Results](#results)
+- [Trained Models](#trained-models)
 ## Recap
 In this paper, we propose a simple three-stage framework to process long-sequence input for transformers.
-![pipeline](./model.png)
+![pipeline](./assets/model.png)
+
+## Requirements
++ python >= 3.8
++ transformers = 4.42.4
++ pytorch >= 1.9.0
++ datasets >= 2.10.0
++ evaluate >= 0.4.2
 ## Installation
 - `conda create --name env --file spec-file.txt`
 - `pip install -r requirements.txt`
@@ -24,7 +35,7 @@ In this paper, we propose a simple three-stage framework to process long-sequenc
   pip install -r requirements.txt
   python setup.py install
   ```
-- For the ROUGE calculation with the standard Perl package from [here](https://github.com/summanlp/evaluation/tree/master/ROUGE-RELEASE-1.5.5).
+- (Optional) For the ROUGE calculation with the standard Perl package from [here](https://github.com/summanlp/evaluation/tree/master/ROUGE-RELEASE-1.5.5).
   ```console
   # make sure perl and cpan is installed
   perl --version
@@ -55,7 +66,7 @@ In this paper, we propose a simple three-stage framework to process long-sequenc
   ```
 - For BERTScore, using evaluation tool from [here](https://github.com/Tiiiger/bert_score)
 
-## Preprocessing
+## Datasets
 We use the following datasets for our experiments. 
 - arXiv -> [https://github.com/armancohan/long-summarization](https://github.com/armancohan/long-summarization)
 - PubMed -> [https://github.com/armancohan/long-summarization](https://github.com/armancohan/long-summarization)
@@ -65,12 +76,34 @@ We use the following datasets for our experiments.
 - WCEP -> [https://github.com/allenai/PRIMER](https://github.com/allenai/PRIMER)
 - NarrativeQA -> [https://github.com/google-deepmind/narrativeqa](https://github.com/google-deepmind/narrativeqa)
 
-We can also download the preprocessed datasets: [arXiv](https://huggingface.co/datasets/ccdv/arxiv-summarization), [PubMed](https://huggingface.co/datasets/ccdv/pubmed-summarization), [GovReport](https://huggingface.co/datasets/ccdv/govreport-summarization), [SummScreen](), [Multi-News](https://drive.google.com/file/d/15HI5DFiVbSvHnXPOlzOhPAnbPUDdRQxZ/view?usp=sharing), [WCEP](), [NarrativeQA]().
+We also provide the preprocessed datasets: [arXiv](https://huggingface.co/datasets/JW-X/arxiv_bart_512), [PubMed](https://huggingface.co/datasets/JW-X/pubmed_bart_512), [GovReport](https://huggingface.co/datasets/JW-X/govreport_bart_512), [SummScreen](https://huggingface.co/datasets/JW-X/summscreen_bart_512), [Multi-News](https://huggingface.co/datasets/JW-X/multinews_bart_512), [WCEP](https://huggingface.co/datasets/JW-X/wcep_bart_512), [NarrativeQA](https://huggingface.co/datasets/JW-X/nrtv_bart_512).
+| Dataset  |  Chunk Size | Hugging Face link |
+| ------------- | ------------- | ------------- |
+| GovReport | 512 | [JW-X/govreport_bart_512](https://huggingface.co/datasets/JW-X/govreport_bart_512)  |
+| SummScreen  | 512  | [JW-X/summscreen_bart_512](https://huggingface.co/datasets/JW-X/summscreen_bart_512) |
+| Arxiv | 512 | [JW-X/arxiv_bart_512](https://huggingface.co/datasets/JW-X/arxiv_bart_512) |
+| PubMed  | 512 | [JW-X/pubmed_bart_512](https://huggingface.co/datasets/JW-X/pubmed_bart_512)  |
+| Multi-News  | 512 | [JW-X/multinews_bart_512](https://huggingface.co/datasets/JW-X/multinews_bart_512)  |
+| WCEP-10  | 512 | [JW-X/wcep_bart_512](https://huggingface.co/datasets/JW-X/wcep_bart_512)  |
+| NarrativeQA  | 512 | [JW-X/nrtv_bart_512](https://huggingface.co/datasets/JW-X/nrtv_bart_512)  |
   
 ## Training
 ```console
 python main.py --cuda --gpuid [list of gpuid] --config [name of config] -l -p [number of port]
 ```
+
+## Trained Models
+
+| Dataset  |  Method | Hugging Face link |
+| ------------- | ------------- | ------------- |
+| GovReport | BART-base + SimCAS  | [JW-X/simcas-bart-base-govreport-512]()  |
+| SummScreen  | BART-base + SimCAS  | [JW-X/simcas-bart-base-summscreen-512]() |
+| Arxiv | BART-base + SimCAS  | [JW-X/simcas-bart-base-arxiv-512]() |
+| PubMed  | BART-base + SimCAS  | [JW-X/simcas-bart-base-pubmed-512]()  |
+| Multi-News  | BART-base + SimCAS  | [JW-X/simcas-bart-base-multinews-512]()  |
+| WCEP-10  | BART-base + SimCAS  | [JW-X/simcas-bart-base-wcep-512]()  |
+| NarrativeQA  | BART-base + SimCAS  | [JW-X/simcas-bart-base-nrtv-512]()  |
+
 ## Evaluation
 ### Example on SummScreen
 ```console
@@ -83,6 +116,11 @@ python cal_rouge.py --ref ./result/summscreen/test.target.tokenized --hyp ./resu
 
 python cal_rouge.py --ref ./result/summscreen/test.target.tokenized --hyp ./result/summscreen/test.out.tokenized --type summscreen -l -p
 ```
+
+## Results
+![gov_sum](./assets/gov_and_sum.png)
+![arxiv_pub](./assets/arxiv_and_pub.png)
+![mul_wcep](./assets/mul_and_wcep.png)
 ## Citation
 ```console
 @misc{xie2023chunk,
