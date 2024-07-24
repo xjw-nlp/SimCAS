@@ -76,6 +76,10 @@ We use the following datasets for our experiments.
 - WCEP -> [https://github.com/allenai/PRIMER](https://github.com/allenai/PRIMER)
 - NarrativeQA -> [https://github.com/google-deepmind/narrativeqa](https://github.com/google-deepmind/narrativeqa)
 
+The input length distribution for each dataset is as follows:
+
+![dist](./assets/dist.png)
+
 We also provide the preprocessed datasets: [arXiv](https://huggingface.co/datasets/JW-X/arxiv_bart_512), [PubMed](https://huggingface.co/datasets/JW-X/pubmed_bart_512), [GovReport](https://huggingface.co/datasets/JW-X/govreport_bart_512), [SummScreen](https://huggingface.co/datasets/JW-X/summscreen_bart_512), [Multi-News](https://huggingface.co/datasets/JW-X/multinews_bart_512), [WCEP](https://huggingface.co/datasets/JW-X/wcep_bart_512), [NarrativeQA](https://huggingface.co/datasets/JW-X/nrtv_bart_512).
 | Dataset  |  Chunk Size | Hugging Face link |
 | ------------- | ------------- | ------------- |
