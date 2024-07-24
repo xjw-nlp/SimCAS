@@ -12,9 +12,10 @@ The repository contains the source code, data, and models for the paper [Chunk, 
 - [Installation](#installation)
 - [Datasets](#datasets)
 - [Training](#training)
+- [Trained Models](#trained-models)
 - [Evaluation](#evaluation)
 - [Results](#results)
-- [Trained Models](#trained-models)
+
 ## Recap
 In this paper, we propose a simple three-stage framework to process long-sequence input for transformers.
 ![pipeline](./assets/model.png)
