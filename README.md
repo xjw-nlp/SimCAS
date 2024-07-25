@@ -101,13 +101,13 @@ python main.py --cuda --gpuid [list of gpuid] --config [name of config] -l -p [n
 
 | Dataset  |  Method | Hugging Face link |
 | ------------- | ------------- | ------------- |
-| GovReport | BART-base + SimCAS  | [JW-X/simcas-bart-base-govreport-512]()  |
-| SummScreen  | BART-base + SimCAS  | [JW-X/simcas-bart-base-summscreen-512]() |
-| Arxiv | BART-base + SimCAS  | [JW-X/simcas-bart-base-arxiv-512]() |
-| PubMed  | BART-base + SimCAS  | [JW-X/simcas-bart-base-pubmed-512]()  |
-| Multi-News  | BART-base + SimCAS  | [JW-X/simcas-bart-base-multinews-512]()  |
-| WCEP-10  | BART-base + SimCAS  | [JW-X/simcas-bart-base-wcep-512]()  |
-| NarrativeQA  | BART-base + SimCAS  | [JW-X/simcas-bart-base-nrtv-512]()  |
+| GovReport | BART-base + SimCAS  | [JW-X/simcas-bart-base-govreport-512](https://huggingface.co/JW-X/simcas-bart-base-govreport-512)  |
+| SummScreen  | BART-base + SimCAS  | [JW-X/simcas-bart-base-summscreen-512](https://huggingface.co/JW-X/simcas-bart-base-summscreen-512) |
+| Arxiv | BART-base + SimCAS  | [JW-X/simcas-bart-base-arxiv-512](https://huggingface.co/JW-X/simcas-bart-base-arxiv-512) |
+| PubMed  | BART-base + SimCAS  | [JW-X/simcas-bart-base-pubmed-512](https://huggingface.co/JW-X/simcas-bart-base-pubmed-512)  |
+| Multi-News  | BART-base + SimCAS  | [JW-X/simcas-bart-base-multinews-512](https://huggingface.co/JW-X/simcas-bart-base-multinews-512)  |
+| WCEP-10  | BART-base + SimCAS  | [JW-X/simcas-bart-base-wcep-512](https://huggingface.co/JW-X/simcas-bart-base-wcep-512)  |
+| NarrativeQA  | BART-base + SimCAS  | [JW-X/simcas-bart-base-nrtv-512](https://huggingface.co/JW-X/simcas-bart-base-nrtv-512)  |
 
 ## Evaluation
 ### Example on SummScreen
