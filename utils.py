@@ -32,6 +32,7 @@ class Recorder():
     def write_config(self, args, models, name):
         if self.log:
             with open(os.path.join(self.dir, "config.txt"), "w") as f:
+                print(f'main process: {os.getpid()}', file=f)
                 print(name, file=f)
                 print(args, file=f)
                 print(file=f)
