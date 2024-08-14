@@ -189,7 +189,7 @@ def evaluation(args):
         print("evaluation rouge1: %.6f, rouge2: %.6f, rougeL: %.6f, rougeLsum: %.6f"%(sample_rouge1, sample_rouge2, sample_rougeL, sample_rougeLsum))
 
 
-def test_qa(gen_dataloader, model, args, tok, gpuid, do_sample=False):
+def test_qa(gen_dataloader, model, args, tok, gpuid):
     model.eval()
     if args.cuda:
         device = f"cuda:{gpuid}"
@@ -255,7 +255,7 @@ def test_qa(gen_dataloader, model, args, tok, gpuid, do_sample=False):
         }
 
 
-def test(gen_dataloader, model, args, tok, gpuid, do_sample=False):
+def test(gen_dataloader, model, args, tok, gpuid):
     model.eval()
     if args.cuda:
         device = f"cuda:{gpuid}"
@@ -453,7 +453,7 @@ def run(rank, args):
                     param.requires_grad = True
                     
                 is_warmup = False
-                all_step_cnt == 0
+                all_step_cnt = 0
                 
             step_cnt += 1
             # forward pass
@@ -553,38 +553,34 @@ def run(rank, args):
                             with torch.no_grad():
                                 old_approx_kl = (-logratio).mean()
                                 approx_kl = ((ratio - 1) - logratio).mean()
+                           
+                            mb_advantages = agent_dict['advantages'][num_idx][:, mb_inds]
+                            if mb_advantages.size(-1) > 1:
+                                mb_advantages_norm = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
+                            else:
+                                mb_advantages_norm = mb_advantages
                             
-                            try:
-                                mb_advantages = agent_dict['advantages'][num_idx][:, mb_inds]
-                                if mb_advantages.size(-1) > 1:
-                                    mb_advantages_norm = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
-                                else:
-                                    mb_advantages_norm = mb_advantages
-                                
-                                pg_loss1 = -mb_advantages_norm * ratio
-                                pg_loss2 = -mb_advantages_norm * torch.clamp(ratio, 1 - clip_coef, 1 + clip_coef)
-                                pg_loss = torch.max(pg_loss1, pg_loss2).mean()
-                                
-                                v_loss_unclipped = (newvalue - agent_dict['returns'][num_idx][:, mb_inds]) ** 2
-                                v_clipped = agent_dict['values'][num_idx][:, mb_inds] + torch.clamp(
-                                    newvalue - agent_dict['values'][num_idx][:, mb_inds], -clip_coef, clip_coef)
-                                v_loss_clipped = (v_clipped - agent_dict['returns'][num_idx][:, mb_inds]) ** 2
-                                v_loss_max = torch.max(v_loss_clipped, v_loss_unclipped)
-                                v_loss = 0.5 * v_loss_max.mean()
-                                
-                                entropy_loss = entropy.mean()
-                                agent_loss = pg_loss - 0.1 * entropy_loss + v_loss
-                                avg_agent_loss += agent_loss.item()
-                                avg_policy_loss += pg_loss.item()
-                                avg_value_loss += v_loss.item()
-                                avg_entropy += entropy_loss.item()
-                                agent_loss.backward()
-                                count += 1
-                                agent_optimizer.step()
-                                agent_optimizer.zero_grad()
-                            except:
-                                print(f'mb_ids: {mb_inds}, ratio: {ratio}, raw advantage: {mb_advantages}, advantage: {mb_advantages_norm}, \
-                                      v_clipped: {v_loss_clipped}, v_unclipped: {v_loss_unclipped}, p_loss1: {pg_loss1}, p_loss2: {pg_loss2}, entropy: {entropy_loss}')
+                            pg_loss1 = -mb_advantages_norm * ratio
+                            pg_loss2 = -mb_advantages_norm * torch.clamp(ratio, 1 - clip_coef, 1 + clip_coef)
+                            pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+                            
+                            v_loss_unclipped = (newvalue - agent_dict['returns'][num_idx][:, mb_inds]) ** 2
+                            v_clipped = agent_dict['values'][num_idx][:, mb_inds] + torch.clamp(
+                                newvalue - agent_dict['values'][num_idx][:, mb_inds], -clip_coef, clip_coef)
+                            v_loss_clipped = (v_clipped - agent_dict['returns'][num_idx][:, mb_inds]) ** 2
+                            v_loss_max = torch.max(v_loss_clipped, v_loss_unclipped)
+                            v_loss = 0.5 * v_loss_max.mean()
+                            
+                            entropy_loss = entropy.mean()
+                            agent_loss = pg_loss - 0.1 * entropy_loss + v_loss
+                            avg_agent_loss += agent_loss.item()
+                            avg_policy_loss += pg_loss.item()
+                            avg_value_loss += v_loss.item()
+                            avg_entropy += entropy_loss.item()
+                            agent_loss.backward()
+                            count += 1
+                            agent_optimizer.step()
+                            agent_optimizer.zero_grad()
                     
                     if is_master:
                         print(f'policy_loss: {avg_policy_loss / count}, value_loss: {avg_value_loss / count}, entropy: {avg_entropy / count}')
@@ -639,7 +635,7 @@ def run(rank, args):
                 if len(args.gpuid) > 1:
                     dist.barrier()
                 if args.config != 'nrtv':
-                    result = test(val_dataloader, model, args, tok, gpuid, args.do_sample)
+                    result = test(val_dataloader, model, args, tok, gpuid)
                     mle_loss = eval_fn(result["sample_rouge1"], result["sample_rouge2"], result["sample_rougeL"])
                     if mle_loss < minimum_mle_loss and is_master:
                         minimum_mle_loss = mle_loss
@@ -656,7 +652,7 @@ def run(rank, args):
                             wandb.log({'gen_rouge1': result["sample_rouge1"], 'gen_rouge2': result["sample_rouge2"], "gen_rougeL": result["sample_rougeL"], \
                                     "gen_rougeLsum": result["sample_rougeLsum"]})
                 else:
-                    result = test_qa(val_dataloader, model, args, tok, gpuid, args.do_sample)
+                    result = test_qa(val_dataloader, model, args, tok, gpuid)
                     mle_loss = eval_fn(result["em"], result["f1"])
                     if mle_loss < minimum_mle_loss and is_master:
                         minimum_mle_loss = mle_loss
