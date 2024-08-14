@@ -361,8 +361,8 @@ def run(rank, args):
         recorder = Recorder(args, args.log, desc=args.desc)
     # build dataloader
     tok = BartTokenizer.from_pretrained(args.model_type)
-    train_set = AgentDataset(args, args.model_type, dataset_name=args.dataset_name, data_type='validation', tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len)
-    val_set = AgentDataset(args, args.model_type, dataset_name=args.dataset_name, data_type='test', tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len)
+    train_set = AgentDataset(args, args.model_type, dataset_name=args.dataset_name, data_type='train', tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len)
+    val_set = AgentDataset(args, args.model_type, dataset_name=args.dataset_name, data_type='validation', tokenizer=tok, max_input_len=args.max_input_len, max_output_len=args.max_output_len)
     collate_fn = partial(collate_mp_agent, pad_token_id=tok.pad_token_id)
     collate_fn_val = partial(collate_mp_agent, pad_token_id=tok.pad_token_id)
     if is_mp:
