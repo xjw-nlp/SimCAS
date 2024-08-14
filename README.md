@@ -128,12 +128,23 @@ python cal_rouge.py --ref ./result/summscreen/test.target.tokenized --hyp ./resu
 ![mul_wcep](./assets/mul_and_wcep.png)
 ## Citation
 ```console
-@misc{xie2023chunk,
-      title={Chunk, Align, Select: A Simple Long-sequence Processing Method for Transformers}, 
-      author={Jiawen Xie and Pengyu Cheng and Xiao Liang and Yong Dai and Nan Du},
-      year={2023},
-      eprint={2308.13191},
-      archivePrefix={arXiv},
-      primaryClass={cs.CL}
+@inproceedings{xie-etal-2024-chunk,
+    title = "Chunk, Align, Select: A Simple Long-sequence Processing Method for Transformers",
+    author = "Xie, Jiawen  and
+      Cheng, Pengyu  and
+      Liang, Xiao  and
+      Dai, Yong  and
+      Du, Nan",
+    editor = "Ku, Lun-Wei  and
+      Martins, Andre  and
+      Srikumar, Vivek",
+    booktitle = "Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)",
+    month = aug,
+    year = "2024",
+    address = "Bangkok, Thailand",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2024.acl-long.729",
+    pages = "13500--13519",
+    abstract = "Although dominant in natural language processing, transformer-based models still struggle with long-sequence processing, due to the computational costs of their self-attention operations, which increase exponentially as the length of the input sequence grows. To address this challenge, we propose a **Sim**ple framework to enhance the long-content processing of off-the-shelf pre-trained transformers via three steps: **C**hunk, **A**lign, and **S**elect (SimCAS). More specifically, we first divide each long-sequence input into a batch of chunks, then align the inter-chunk information during the encoding steps, and finally, select the most representative hidden states from the encoder for the decoding process. With our SimCAS, the computation and memory costs can be reduced to linear complexity. In experiments, we demonstrate the effectiveness of the proposed method on various real-world long-text summarization and reading comprehension tasks, in which SimCAS significantly outperforms prior long-sequence processing baselines. The code is at [https://github.com/xjw-nlp/SimCAS](https://github.com/xjw-nlp/SimCAS).",
 }
 ```
