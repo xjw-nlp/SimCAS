@@ -7,7 +7,7 @@ from datasets import load_dataset, load_from_disk
 import random
 
 
-MAX_LENGTH = 32768
+MAX_LENGTH = 16384
 
 
 def to_cuda(batch, gpuid):
