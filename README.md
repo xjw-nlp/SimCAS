@@ -1,3 +1,5 @@
+
+
 # SimCAS
 [![Code License](https://img.shields.io/badge/Code%20License-Apache_2.0-green.svg)](https://github.com/xjw-nlp/SimCAS/blob/main/LICENSE)
 [![Data License](https://img.shields.io/badge/Data%20License-CC%20By%20NC%204.0-red.svg)](https://github.com/xjw-nlp/SimCAS/blob/main/DATA_LICENSE)
@@ -94,7 +96,7 @@ We also provide the preprocessed datasets: [arXiv](https://huggingface.co/datase
   
 ## Training
 ```console
-python main.py --cuda --gpuid [list of gpuid] --config [name of config] -l -p [number of port]
+python main.py --cuda --is_offline --gpuid [list of gpuid] --config [name of config] -l -p [number of port]
 ```
 
 ## Trained Models
